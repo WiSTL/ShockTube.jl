@@ -68,7 +68,7 @@ function shockjump!(gas, Mach)
     return gas, u2
 end
 
-shockjump(gas, Mach) = shockjump!(pycopy(gas), Mach)
+shockjump(gas, Mach) = shockjump!(copy(gas), Mach)
 
 function driverstate(driver, driven, Ms)
     γ1, γ4 = γ(driven), γ(driver)
