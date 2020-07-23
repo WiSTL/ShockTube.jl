@@ -65,7 +65,7 @@ function shockjump!(gas, Mach)
            √((1 + α1) * (1 + α1 * PR)))
     gas.P = gas.P * PR
     gas.T = gas.T * TR
-    return gas, u2
+    return gas, uconvert(u"m/s", u2)
 end
 
 shockjump(gas, Mach) = shockjump!(copy(gas), Mach)
