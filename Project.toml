@@ -3,6 +3,11 @@ uuid = "26b2f303-670f-4a9c-b974-2622b8a2fb46"
 authors = ["Alex Ames <aames@wisc.edu> and contributors"]
 version = "0.1.0"
 
+[deps]
+Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
+PyCall = "438e738f-606a-5dbb-bf0a-cddfbfd45ab0"
+Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
+
 [compat]
 julia = "1"
 
