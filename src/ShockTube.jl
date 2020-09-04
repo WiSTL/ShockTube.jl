@@ -6,7 +6,7 @@ using Unitful
 import Base: convert, ==, isequal, hash, getindex, setindex!, haskey, keys, show
 export Species, Mixture
 export γ, T, p, ρ, ρm, R_specific, soundspeed
-export shockjump!, shockjump
+export shockjump!, shockjump, driverpressure!, driverpressure, shockcalc!, shockcalc
 
 include("init.jl")
 # PyCopy = pyimport("copy")
@@ -85,3 +85,5 @@ function shockcalc!(driver, driven, Ms)
     return (driver = driver, driven = driven, shocked=shocked, u2=u2)
 end
 shockcalc(driver, driven, Ms) = shockcalc!(copy(driver), driven, Ms)
+
+end
