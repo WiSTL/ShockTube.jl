@@ -66,9 +66,6 @@ begin
 	"""
 end
 
-# ╔═╡ 3353ecf0-eede-11ea-291d-e1dd2da2e812
-
-
 # ╔═╡ 692684b0-e893-11ea-2af9-756ab48bcdd0
 HeAce = Mixture(["Helium", "Acetone"], zs=[1 - χAce_in, χAce_in])
 
@@ -80,6 +77,23 @@ Ace_slpm = ṅ * χAce_in / ρm(Ace) |> u"cm^3 / minute"
 
 # ╔═╡ 6b7a74e0-e895-11ea-015c-aba28e723af1
 He_slpm = ṅ * (1 - χAce_in) / ρm(He) |> u"L/minute"
+
+# ╔═╡ 209a1e20-eef9-11ea-2e0a-b3b5b43861b6
+md""" ## Shock jump conditions for helium/acetone mixture"""
+
+# ╔═╡ c238a120-eef9-11ea-35cd-f744665ba19a
+begin
+	Mach_slider = @bind Mach NumberField(LinRange(1.1, 2.8, 101))
+	md"""
+	Mach number $Mach_slider
+	"""
+end
+
+# ╔═╡ 1da4d2f0-eef9-11ea-0752-cf0358151391
+N2 = Species("N2")
+
+# ╔═╡ 13cbc450-eef9-11ea-24e0-0fa6efd42922
+p(shockcalc(N2, HeAce, Mach).driver) |> u"psi"
 
 # ╔═╡ Cell order:
 # ╟─2f4c7d80-e893-11ea-3771-d3c8088a873a
@@ -94,8 +108,11 @@ He_slpm = ṅ * (1 - χAce_in) / ρm(He) |> u"L/minute"
 # ╟─85bf68b0-e890-11ea-04d6-e1cfff79278d
 # ╟─3e9944d0-e893-11ea-30de-332f76096802
 # ╠═b53e58a0-e893-11ea-111e-37b14cf3dcab
-# ╠═3353ecf0-eede-11ea-291d-e1dd2da2e812
 # ╟─692684b0-e893-11ea-2af9-756ab48bcdd0
 # ╟─3bcce8f0-e894-11ea-0ff0-25d9c9785a15
 # ╟─ab9018a0-e895-11ea-10ab-03e7704de77d
 # ╟─6b7a74e0-e895-11ea-015c-aba28e723af1
+# ╟─209a1e20-eef9-11ea-2e0a-b3b5b43861b6
+# ╟─c238a120-eef9-11ea-35cd-f744665ba19a
+# ╟─1da4d2f0-eef9-11ea-0752-cf0358151391
+# ╠═13cbc450-eef9-11ea-24e0-0fa6efd42922
