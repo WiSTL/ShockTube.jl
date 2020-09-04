@@ -53,7 +53,7 @@ p(f::Fluid)  = f.P * u"Pa"
 ρm(f::Fluid) = f.rhom * u"mol/m^3"
 γ(f::Fluid)  = f.isentropic_exponent
 R_specific(f::Fluid)  = f.R_specific * u"J/(kg*K)"
-soundspeed(f::Fluid) = sqrt(γ(f) * R_specific(f) * T(f))
+soundspeed(f::Fluid) = sqrt(γ(f) * R_specific(f) * T(f)) |> u"m/s"  
 
 # Shock jump conditions
 function shockjump!(gas, Mach)
@@ -70,12 +70,18 @@ end
 
 shockjump(gas, Mach) = shockjump!(copy(gas), Mach)
 
-function driverstate(driver, driven, Ms)
+function driverpressure!(driver, driven, Ms)
     γ1, γ4 = γ(driven), γ(driver)
     a1, a4 = soundspeed(driven), soundspeed(driver)
-    P4 = driven.P * (1 + 2γ1 / (γ1 + 1) * (Ms^2 - 1)) *
+    driver.P = driven.P * (1 + 2γ1 / (γ1 + 1) * (Ms^2 - 1)) *
                     (1 + a1 / a4 * (γ4 - 1) / (γ1 + 1) * (1/Ms - Ms)) ^ (2γ4 / (1 - γ4))
-
+    return driver
 end
+driverpressure(driver, driven, Ms) = driverpressure!(copy(driver), driven, Ms)
 
+function shockcalc!(driver, driven, Ms)
+    shocked, u2 = shockjump(driven, Ms)
+    driverpressure!(driver, driven, Ms)
+    return (driver = driver, driven = driven, shocked=shocked, u2=u2)
 end
+shockcalc(driver, driven, Ms) = shockcalc!(copy(driver), driven, Ms)
