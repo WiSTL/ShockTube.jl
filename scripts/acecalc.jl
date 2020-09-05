@@ -90,10 +90,10 @@ begin
 end
 
 # ╔═╡ 1da4d2f0-eef9-11ea-0752-cf0358151391
-N2 = Species("N2")
+driver_gas = Species("N2")
 
 # ╔═╡ 13cbc450-eef9-11ea-24e0-0fa6efd42922
-p(shockcalc(N2, HeAce, Mach).driver) |> u"psi"
+driver_pressure = p(shockcalc(driver_gas, HeAce, Mach).driver) |> u"psi"
 
 # ╔═╡ Cell order:
 # ╟─2f4c7d80-e893-11ea-3771-d3c8088a873a
@@ -107,7 +107,7 @@ p(shockcalc(N2, HeAce, Mach).driver) |> u"psi"
 # ╟─70091700-e890-11ea-0307-31689d3e8e9f
 # ╟─85bf68b0-e890-11ea-04d6-e1cfff79278d
 # ╟─3e9944d0-e893-11ea-30de-332f76096802
-# ╠═b53e58a0-e893-11ea-111e-37b14cf3dcab
+# ╟─b53e58a0-e893-11ea-111e-37b14cf3dcab
 # ╟─692684b0-e893-11ea-2af9-756ab48bcdd0
 # ╟─3bcce8f0-e894-11ea-0ff0-25d9c9785a15
 # ╟─ab9018a0-e895-11ea-10ab-03e7704de77d
@@ -115,4 +115,4 @@ p(shockcalc(N2, HeAce, Mach).driver) |> u"psi"
 # ╟─209a1e20-eef9-11ea-2e0a-b3b5b43861b6
 # ╟─c238a120-eef9-11ea-35cd-f744665ba19a
 # ╟─1da4d2f0-eef9-11ea-0752-cf0358151391
-# ╠═13cbc450-eef9-11ea-24e0-0fa6efd42922
+# ╟─13cbc450-eef9-11ea-24e0-0fa6efd42922
