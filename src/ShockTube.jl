@@ -3,10 +3,19 @@ module ShockTube
 using PyCall 
 using Printf
 using Unitful
+using Dates
+using CSV
+using DataFrames: DataFrame, mapcols!
+using DSP: digitalfilter, Lowpass, Butterworth, filtfilt
+using ImageFiltering: mapwindow
+using Statistics: median
+
 import Base: convert, ==, isequal, hash, getindex, setindex!, haskey, keys, show
+
 export Species, Mixture
-export γ, T, p, ρ, ρm, R_specific, soundspeed
+export γ, temperature, pressure, density, molar_density, R_specific, soundspeed
 export shockjump!, shockjump, driverpressure!, driverpressure, shockcalc!, shockcalc
+export PressureTrace, xt_data
 
 include("init.jl")
 # PyCopy = pyimport("copy")
@@ -47,13 +56,13 @@ mutable struct Flow{F <: Fluid, DU <: Unitful.FreeUnits}
 end
 
 # Fluid property accessors
-T(f::Fluid)  = f.T * u"K"
-p(f::Fluid)  = f.P * u"Pa"
-ρ(f::Fluid)  = f.rho * u"kg/m^3"
-ρm(f::Fluid) = f.rhom * u"mol/m^3"
+temperature(f::Fluid)  = f.T * u"K"
+pressure(f::Fluid)  = f.P * u"Pa"
+density(f::Fluid)  = f.rho * u"kg/m^3"
+molar_density(f::Fluid) = f.rhom * u"mol/m^3"
 γ(f::Fluid)  = f.isentropic_exponent
 R_specific(f::Fluid)  = f.R_specific * u"J/(kg*K)"
-soundspeed(f::Fluid) = sqrt(γ(f) * R_specific(f) * T(f)) |> u"m/s"  
+soundspeed(f::Fluid) = sqrt(γ(f) * R_specific(f) * temperature(f)) |> u"m/s"  
 
 # Shock jump conditions
 function shockjump!(gas, Mach)
@@ -86,4 +95,68 @@ function shockcalc!(driver, driven, Ms)
 end
 shockcalc(driver, driven, Ms) = shockcalc!(copy(driver), driven, Ms)
 
+struct PressureTrace
+    t::StepRangeLen{Float64, Base.TwicePrecision{Float64}, Base.TwicePrecision{Float64}}
+    timestamp::DateTime
+    data::DataFrame
 end
+
+function PressureTrace(filepath, filter=(median_size = 15, lowpass_mul=100, filt=Butterworth(2)))
+    open(filepath) do f
+        header = Dict(Pair(split(readline(f), '\t', limit=3)[1:2]...) for i = 1:23)
+
+        t = range(parse(Float64, header["X0"]), 
+        length = parse(Int, header["Samples"]), 
+          step = parse(Float64, header["Delta_X"]))
+
+        date = Date(header["Date"], "yyyy/mm/dd")
+        time = Time(first(split(header["Time"], '.')))
+        timestamp = DateTime(date, time)
+
+        seekstart(f)
+        data = CSV.File(f, datarow=24, drop=[1], delim='\t', 
+            header="PT" .* string.(0:12)) |> DataFrame
+        
+        
+        if !isnothing(filter)
+            freq = 1/step(t)
+            lowpass = digitalfilter(Lowpass(freq/filter.lowpass_mul, fs=freq), filter.filt)
+            mapcols!(data) do s
+                s̄ = mapwindow(median, s, filter.median_size)
+                ŝ = filtfilt(lowpass, s)
+                [median((s[i], s̄[i], ŝ[i])) for i in eachindex(s)]
+            end
+        end
+        PressureTrace(t, timestamp, data)
+    end
+end
+
+function xt_data(ptrace, driver, driven, ptloc_filepath, trigger::Pair, ref_PT::Symbol)
+    ptlocs = CSV.File(ptloc_filepath) |> DataFrame
+    trigger_PT, trigger_thresh = trigger
+
+    # Get PT indices (PT1 => 1, PT9 => 9, etc) within ptlocs
+    trigger_idx = parse(Int, string(trigger_PT)[3:end])
+    ref_idx = parse(Int, string(ref_PT)[3:end])
+
+    # find trigger time index
+    trigger_sensor = >(ustrip(trigger_thresh |> u"psi"))
+    trigger_ptrace_idx = findfirst(trigger_sensor, ptrace.data[!, trigger_PT])
+
+    ref_ptrace_idx = findfirst(trigger_sensor, ptrace.data[!, ref_PT])
+    Δt = ptrace.t[ref_ptrace_idx] - ptrace.t[trigger_ptrace_idx]
+    Δx = ptlocs[ref_idx, :x_m] - ptlocs[trigger_idx, :x_m]
+
+    # calculate Mach number between trigger and reference PTs
+    W₀ = (Δx / Δt)*u"m/s"
+    M₀ = W₀/soundspeed(driven)
+
+    # determine gas states
+    states = shockcalc(driver, driven, M₀)
+    shocked_psi = pressure(states.shocked) |> u"psi" |> ustrip
+    t_shock = [isnothing(i) ? NaN : ptrace.t[i] for i in findfirst.(>(0.5*shocked_psi), eachcol(ptrace.data))]
+
+    return states, DataFrame(:x => ptlocs[!, :x_m], :t_shock => t_shock)
+end
+
+end # module

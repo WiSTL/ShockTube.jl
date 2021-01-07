@@ -4,11 +4,15 @@ authors = ["Alex Ames <aames@wisc.edu> and contributors"]
 version = "0.1.2"
 
 [deps]
+CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
+DSP = "717857b8-e6f2-59f4-9121-6e50c889abd2"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
+ImageFiltering = "6a3955dd-da59-5b1f-98d4-e7296123deb5"
 Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
-Pluto = "c3e4b0f8-55cb-11ea-2926-15256bba5781"
-PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 PyCall = "438e738f-606a-5dbb-bf0a-cddfbfd45ab0"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 
 [compat]
