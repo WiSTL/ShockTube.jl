@@ -2,13 +2,17 @@ module ShockTube
 
 using PyCall 
 using Printf
-using Unitful
+using Reexport
+@reexport using Unitful
 using Dates
 using CSV
 using DataFrames: DataFrame, mapcols!
 using DSP: digitalfilter, Lowpass, Butterworth, filtfilt
 using ImageFiltering: mapwindow
 using Statistics: median
+
+# using Reexport
+# @reexport using Unitful: @u_str
 
 import Base: convert, ==, isequal, hash, getindex, setindex!, haskey, keys, show
 
@@ -131,8 +135,69 @@ function PressureTrace(filepath, filter=(median_size = 15, lowpass_mul=100, filt
     end
 end
 
-function xt_data(ptrace, driver, driven, ptloc_filepath, trigger::Pair, ref_PT::Symbol)
-    ptlocs = CSV.File(ptloc_filepath) |> DataFrame
+"""
+    xt_data(ptrace, ptlocs, driver, driven, trigger, ref_PT)
+
+Calculate the time of shock arrival at each pressure transducer.
+Uses the driven gas properties and the Δx/Δt between the trigger
+and reference pressure transducers to calculate an approximate Mach
+number, which is used to determine driver conditions and shocked 
+gas pressure for determination of shock arrival time at each transducer.
+
+    Arguments:
+    - `ptrace::PressureTrace`
+    - `ptlocs::DataFrame`
+    - `driver::Fluid`, e.g. `Species("Helium")`
+    - `driven::Fluid`, e.g. `Mixture(["Helium", "Acetone"], zs=[0.95, 0.05])`
+    - `trigger::Pair{Symbol, Unitful.Quantity}`, e.g. `:PT3 => 10u"psi"`
+    - `ref_PT::Symbol`, e.g. `:PT6`
+
+# Examples
+```julia-repl
+julia> ptlocs = CSV.File("PT_locations.csv") |> DataFrame
+12×3 DataFrame
+ Row │ name    x_m       σ_m
+     │ String  Float64   Float64
+─────┼──────────────────────────────
+   1 │ PT1     0.506412  0.00254
+   2 │ PT2     1.36207   0.0035921
+   3 │ PT3     1.8415    0.0035921
+   4 │ PT4     2.05422   0.0035921
+   5 │ PT5     2.33997   0.00299529
+   6 │ PT6     3.84492   0.00392726
+   7 │ PT7     4.49897   0.00392726
+   8 │ PT8     5.10222   0.00392726
+   9 │ PT9     5.42607   0.00392726
+  10 │ PT10    5.98329   0.00392726
+  11 │ PT11    6.50716   0.00392726
+  12 │ PT12    6.75481   0.00392726
+
+julia> xt_data(PressureTrace("run3/ptrace.lvm"), ptlocs, 
+        Species("N2"), Species("Ar"), :PT3 => 10u"psi", :PT6)
+((driver = Species(N2, 298.1 K, 4.275e+06 Pa), 
+  driven = Species(Ar, 298.1 K, 1.013e+05 Pa), 
+ shocked = Species(Ar, 712.5 K, 6.039e+05 Pa), 
+      u2 = 429.3754150350808 m s^-1), 
+      12×2 DataFrame
+ Row │ x         t_shock
+     │ Float64   Float64
+─────┼────────────────────
+   1 │ 0.506412  0.008039
+   2 │ 1.36207   0.009323
+   3 │ 1.8415    0.010003
+   4 │ 2.05422   0.010307
+   5 │ 2.33997   0.010695
+   6 │ 3.84492   0.012797
+   7 │ 4.49897   0.013711
+   8 │ 5.10222   0.014637
+   9 │ 5.42607   0.015019
+  10 │ 5.98329   0.015796
+  11 │ 6.50716   0.016535
+  12 │ 6.75481   0.016881)
+
+```
+"""
+function xt_data(ptrace::PressureTrace, ptlocs::DataFrame, driver::Fluid, driven::Fluid, trigger::Pair, ref_PT::Symbol)
     trigger_PT, trigger_thresh = trigger
 
     # Get PT indices (PT1 => 1, PT9 => 9, etc) within ptlocs
@@ -156,7 +221,45 @@ function xt_data(ptrace, driver, driven, ptloc_filepath, trigger::Pair, ref_PT::
     shocked_psi = pressure(states.shocked) |> u"psi" |> ustrip
     t_shock = [isnothing(i) ? NaN : ptrace.t[i] for i in findfirst.(>(0.5*shocked_psi), eachcol(ptrace.data))]
 
-    return states, DataFrame(:x => ptlocs[!, :x_m], :t_shock => t_shock)
+    return (;states, shock=(;W₀, M₀), xt=DataFrame(:x => ptlocs[!, :x_m], :t_shock => t_shock))
 end
 
+"""
+An alternate `ptrace` syntax allows for Base Julia-only arguments, namely filepaths, strings, and symbols.
+
+# Examples
+```julia-repl
+julia> xt_data("run1/ptrace.lvm", "PTlocations.csv", "N2", "Ar", :PT3 => 10, :PT6)
+((driver = Species(N2, 298.1 K, 1.633e+06 Pa), 
+  driven = Species(Ar, 298.1 K, 1.013e+05 Pa), 
+ shocked = Species(Ar, 563.7 K, 4.085e+05 Pa), 
+      u2 = 316.0718112278267 m s^-1), 
+  12×2 DataFrame
+   Row │ x         t_shock
+       │ Float64   Float64
+  ─────┼────────────────────
+     1 │ 0.506412  0.007734
+     2 │ 1.36207   0.009218
+     3 │ 1.8415    0.010002
+     4 │ 2.05422   0.010372
+     5 │ 2.33997   0.010854
+     6 │ 3.84492   0.013367
+     7 │ 4.49897   0.014464
+     8 │ 5.10222   0.023391
+     9 │ 5.42607   0.016024
+    10 │ 5.98329   0.016962
+    11 │ 6.50716   0.017844
+    12 │ 6.75481   0.018261)
+```
+"""
+function xt_data(ptrace_path, ptloc_path, drivergas, drivengas, trigger, ref_PT; 
+    ptrace_filter = (median_size = 15, lowpass_mul=100, filt=Butterworth(2)))
+
+    ptrace = PressureTrace(ptrace_path, ptrace_filter)
+    ptlocs = CSV.File(ptloc_path) |> DataFrame
+    driver = Species(drivergas)
+    driven = Species(drivengas)
+    trigger_psi = first(trigger) => last(trigger)*u"psi"
+    xt_data(ptrace, ptlocs, driver, driven, trigger_psi, ref_PT)
+end
 end # module
