@@ -40,7 +40,7 @@ end
 Mixture(chemnames::Vector{String}; kwargs...) = Mixture(PyChem.Mixture(chemnames; kwargs...))
 
 PyObject(f::Fluid) = getfield(f, :o)
-convert(::Type{T}, o::PyObject) where {T <: Fluid} = T(o)
+convert(::Type{T}, o::PyCall.PyObject) where {T <: Fluid} = T(o)
 ==(f1::Fluid, f2::Fluid) = PyObject(f1) == PyObject(f2)
 hash(f::Fluid) = hash(PyObject(f))
 Base.copy(f::T) where {T <: Fluid} = T(PyCopy.copy(PyObject(f)))
@@ -92,10 +92,19 @@ function driverpressure!(driver, driven, Ms)
 end
 driverpressure(driver, driven, Ms) = driverpressure!(copy(driver), driven, Ms)
 
+function shockreflect!(shocked, Ms)
+    γ2 = γ(shocked)
+    lhs = Ms/(Ms^2 - 1) * sqrt(1 + 2(γ2 - 1)/(γ2 + 1)^2 * (Ms^2 - 1) * (γ2 + 1/Ms^2))
+    Mr = (1 + sqrt(1 +4*lhs^2))/(2lhs)
+    shockjump!(shocked, Mr)
+end
+shockreflect(shocked, Ms) = shockreflect!(copy(shocked), Ms)
+
 function shockcalc!(driver, driven, Ms)
     shocked, u2 = shockjump(driven, Ms)
     driverpressure!(driver, driven, Ms)
-    return (driver = driver, driven = driven, shocked=shocked, u2=u2)
+    reflected = shockreflect(shocked, Ms)
+    return (driver = driver, driven = driven, shocked=shocked, reflected=reflected, u2=u2)
 end
 shockcalc(driver, driven, Ms) = shockcalc!(copy(driver), driven, Ms)
 
@@ -221,7 +230,7 @@ function xt_data(ptrace::PressureTrace, ptlocs::DataFrame, driver::Fluid, driven
     shocked_psi = pressure(states.shocked) |> u"psi" |> ustrip
     t_shock = [isnothing(i) ? NaN : ptrace.t[i] for i in findfirst.(>(0.5*shocked_psi), eachcol(ptrace.data))]
 
-    return (;states, shock=(;W₀, M₀), xt=DataFrame(:x => ptlocs[!, :x_m], :t_shock => t_shock))
+    return (;ptrace, states, shock=(;W₀, M₀), xt=DataFrame(:x => ptlocs[!, :x_m], :t_shock => t_shock))
 end
 
 """
