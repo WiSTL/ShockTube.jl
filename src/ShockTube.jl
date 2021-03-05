@@ -39,6 +39,15 @@ struct Mixture <: Fluid
 end
 Mixture(chemnames::Vector{String}; kwargs...) = Mixture(PyChem.Mixture(chemnames; kwargs...))
 
+function composition_string(mix)
+    s = "{"
+    for (species, χ) in zip(mix.components, mix.zs)
+        s *= @sprintf("%s: %0.3g, ", species, χ)
+    end
+    s[1:end-2] * "}"
+end
+Base.show(io::IO, mix::Mixture) = @printf(io, "Mixture(%s, %0.1f K, %0.3e Pa)", composition_string(mix), mix.T, mix.P)
+
 PyObject(f::Fluid) = getfield(f, :o)
 convert(::Type{T}, o::PyCall.PyObject) where {T <: Fluid} = T(o)
 ==(f1::Fluid, f2::Fluid) = PyObject(f1) == PyObject(f2)
@@ -103,7 +112,7 @@ shockreflect(shocked, Ms) = shockreflect!(copy(shocked), Ms)
 function shockcalc!(driver, driven, Ms)
     shocked, u2 = shockjump(driven, Ms)
     driverpressure!(driver, driven, Ms)
-    reflected = shockreflect(shocked, Ms)
+    reflected, _ = shockreflect(shocked, Ms)
     return (driver = driver, driven = driven, shocked=shocked, reflected=reflected, u2=u2)
 end
 shockcalc(driver, driven, Ms) = shockcalc!(copy(driver), driven, Ms)
